@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Regeneratable ML feature cache (large, rebuilt automatically by train_ml.py/run_ml.py)
+ml_panel_w365.csv
+
+# Leftover ad-hoc crawl outputs from early experiments, superseded by mb_history_long.csv
+mb_1000d_long.csv
+mb_1000d_summary.csv
+mb_10000d_long.csv
+mb_10000d_summary.csv
+mb_history_summary.csv
