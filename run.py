@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 import requests
 
 import backtest_streak as streaks
+import backtest_wait_k as waitk
 import crawl_loto as crawler
 import predict_loto as predictor
 
@@ -27,6 +28,9 @@ DATA_FILE = "mb_history_long.csv"
 FULL_HISTORY_DAYS = 5000  # comfortably covers the site's data (starts 01/01/2014)
 BACKTEST_DAYS = 500
 RECENT_DAYS = 30
+STREAK_WARMUP = 365  # bỏ qua 1 năm đầu khi tính chuỗi thắng/thua + gợi ý k
+WAIT_K_RANGE = range(1, 16)
+WAIT_K_MIN_SAMPLE = 200  # bỏ qua k nào có quá ít lần vào để tránh gợi ý dựa trên mẫu nhỏ
 
 
 def load_existing(path):
@@ -135,6 +139,48 @@ def explain_top_pick(hist, target, ranked):
     return "\n".join(lines)
 
 
+def suggest_wait_k(full_results):
+    """Best k among candidates with enough sample, by edge vs baseline — plus
+    the current live losing streak, so the reader knows whether they'd be
+    "in" right now under that suggestion. Purely descriptive: see the
+    disclaimer this prints alongside the number.
+    """
+    baseline_rate = sum(1 for _, _, hit in full_results if hit) / len(full_results)
+
+    candidates = []
+    for k in WAIT_K_RANGE:
+        bets = waitk.simulate_wait_k_losses(full_results, k)
+        if len(bets) < WAIT_K_MIN_SAMPLE:
+            continue
+        s = waitk.summarize(bets, baseline_rate)
+        candidates.append((k, s))
+
+    cur_len, cur_start = streaks.current_streak(full_results)
+
+    print("\n=== Gợi ý \"đợi thua liên tiếp rồi mới vào\" ===")
+    if not candidates:
+        print(f"Không có k nào đủ mẫu (>= {WAIT_K_MIN_SAMPLE} lần vào) để gợi ý.")
+        return
+
+    best_k, best_s = max(candidates, key=lambda kv: kv[1]["edge"])
+    print(
+        f"k={best_k}: {best_s['n']} lần vào, thắng {best_s['rate']:.1%} "
+        f"(baseline {baseline_rate:.1%}, chênh {best_s['edge']:+.1%}, {best_s['sigma']:+.2f}σ) "
+        f"— cao nhất trong các k có mẫu đủ lớn"
+    )
+    if abs(best_s["sigma"]) < 2:
+        print("=> Chênh lệch này KHÔNG có ý nghĩa thống kê — đây không phải một mức k thật sự tốt hơn, chỉ là ít nhiễu nhất trong dữ liệu hiện có.")
+
+    if cur_len == 0:
+        print("Hiện tại: kỳ gần nhất đang THẮNG, chưa bắt đầu chuỗi thua nào.")
+    else:
+        print(f"Hiện tại: đang thua liên tiếp {cur_len} kỳ (từ {cur_start:%d/%m/%Y}).")
+        if cur_len >= best_k:
+            print(f"=> Đã đủ {best_k} kỳ thua theo gợi ý trên (dù vậy vẫn không có edge thật, xem cảnh báo trên).")
+        else:
+            print(f"=> Còn thiếu {best_k - cur_len} kỳ thua nữa mới đủ điều kiện theo gợi ý trên.")
+
+
 def main():
     today = datetime.now()
     by_date = update_dataset(today)
@@ -154,8 +200,9 @@ def main():
     print_ranking_table(ranked)
     print_backtest(hist)
 
-    recent_results = streaks.run_strategy(hist, warmup=hist.n_days - RECENT_DAYS)
-    streaks.print_recent(recent_results, RECENT_DAYS)
+    full_results = streaks.run_strategy(hist, warmup=STREAK_WARMUP)
+    streaks.print_recent(full_results[-RECENT_DAYS:], RECENT_DAYS)
+    suggest_wait_k(full_results)
 
     print(f"\n>>> SỐ CHỐT: {ranked[0][0]} <<<")
 

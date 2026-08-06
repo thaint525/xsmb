@@ -30,7 +30,7 @@ NUMBERS = [f"{i:02d}" for i in range(100)]
 HEAT_WINDOW = 30
 
 # Weights are a judgement call, not a fitted result — see the backtest output.
-WEIGHTS = {"freq_long": 1.0, "heat": 0.8, "overdue": 0.6, "weekday": 0.7}
+WEIGHTS = {"freq_long": 0.3, "heat": 0.8, "overdue": 0.6, "weekday": 0.7}
 
 WEEKDAYS_VI = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
 

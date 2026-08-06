@@ -4,3 +4,4 @@ lxml
 scikit-learn
 pandas
 numpy
+scipy
