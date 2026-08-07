@@ -1,0 +1,49 @@
+name: Daily XSMB predict
+
+on:
+  schedule:
+    # 05:00 Asia/Ho_Chi_Minh (UTC+7) == 22:00 UTC the day before
+    - cron: "0 22 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run prediction
+        run: python3 run.py > output.txt 2>&1
+        continue-on-error: true
+
+      - name: Send Telegram alert
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TEXT=$(tail -c 3500 output.txt | iconv -f utf-8 -t utf-8//IGNORE)
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${TEXT}" \
+            -o telegram_response.json -w "\nTelegram HTTP %{http_code}\n"
+          cat telegram_response.json
+
+      - name: Commit updated dataset
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add mb_history_long.csv
+          git diff --cached --quiet || git commit -m "chore: update XSMB data $(date -u +%F)"
+          git push
