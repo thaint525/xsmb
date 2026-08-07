@@ -23,7 +23,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run prediction
-        run: python3 run.py > output.txt 2>&1
+        run: python3 run.py --lang en > output.txt 2>&1
         continue-on-error: true
 
       - name: Send Telegram alert
