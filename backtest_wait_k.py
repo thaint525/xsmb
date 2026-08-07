@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Backtest the "đợi thua k trận rồi mới vào" strategy: only bet the top-1
-pick once the model's daily pick has missed k times in a row; keep betting
-daily until it hits, then go back to watching for the next k-loss streak.
+pick once the model's daily pick has missed k times in a row. Each trigger
+buys exactly ONE bet (win or lose, doesn't matter) — then it's back to
+watching from a clean slate for the next k-loss streak.
 
 This tests the gambler's-fallacy premise that a pick becomes "due" after a
 losing streak. Reuses the (date, pick, hit) sequence from backtest_streak.py
@@ -19,23 +20,19 @@ import predict_loto as predictor
 
 
 def simulate_wait_k_losses(results, k):
-    """Bet only once the underlying top-1 pick has lost k times running;
-    keep betting daily until a win, then resume watching for the next
-    k-loss streak. Returns [(date, pick, hit)] for days actually bet on.
+    """Bet exactly one day once the underlying top-1 pick has lost k times
+    running, then reset the streak to zero regardless of that bet's outcome
+    and resume watching from scratch. Returns [(date, pick, hit)] for the
+    days actually bet on.
     """
     bets = []
     streak = 0
-    betting = False
     for date, pick, hit in results:
-        if betting:
+        if streak >= k:
             bets.append((date, pick, hit))
-            if hit:
-                betting = False
-                streak = 0
+            streak = 0
             continue
         streak = 0 if hit else streak + 1
-        if streak >= k:
-            betting = True
     return bets
 
 

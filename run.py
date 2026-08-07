@@ -61,7 +61,7 @@ STRINGS = {
         "explain_top5": "Top 5 kế tiếp nếu muốn dàn rộng: {list}",
         "waitk_header": "\n=== Gợi ý \"đợi thua liên tiếp rồi mới vào\" ===",
         "waitk_none": "Không có k nào đủ mẫu (>= {min_sample} lần vào) để gợi ý.",
-        "waitk_best": "k={k}: {n} lần vào, thắng {rate:.1%} (baseline {baseline:.1%}, chênh {edge:+.1%}, {sigma:+.2f}σ) — cao nhất trong các k có mẫu đủ lớn",
+        "waitk_best": "k={k}: {n} lần vào, thắng {rate:.1%} (baseline {baseline:.1%}, chênh {edge:+.1%}, {sigma:+.2f}σ) — |sigma| cao nhất trong các k có mẫu đủ lớn",
         "waitk_insig": "=> Chênh lệch này KHÔNG có ý nghĩa thống kê — đây không phải một mức k thật sự tốt hơn, chỉ là ít nhiễu nhất trong dữ liệu hiện có.",
         "waitk_no_streak": "Hiện tại: kỳ gần nhất đang THẮNG, chưa bắt đầu chuỗi thua nào.",
         "waitk_streak": "Hiện tại: đang thua liên tiếp {n} kỳ (từ {date}).",
@@ -99,7 +99,7 @@ STRINGS = {
         "explain_top5": "Next 5 for a wider spread: {list}",
         "waitk_header": '\n=== "Wait for a losing streak before betting" suggestion ===',
         "waitk_none": "No k has enough samples (>= {min_sample} entries) to suggest.",
-        "waitk_best": "k={k}: {n} entries, won {rate:.1%} (baseline {baseline:.1%}, edge {edge:+.1%}, {sigma:+.2f}σ) — best among k values with a large enough sample",
+        "waitk_best": "k={k}: {n} entries, won {rate:.1%} (baseline {baseline:.1%}, edge {edge:+.1%}, {sigma:+.2f}σ) — highest |sigma| among k values with a large enough sample",
         "waitk_insig": "=> This edge is NOT statistically significant — it isn't a genuinely better threshold, just the least noisy one in the current data.",
         "waitk_no_streak": "Right now: the last draw was a WIN, no losing streak in progress.",
         "waitk_streak": "Right now: {n} losses in a row (since {date}).",
@@ -223,10 +223,12 @@ def print_recent(results, msg):
 
 
 def suggest_wait_k(full_results, msg):
-    """Best k among candidates with enough sample, by edge vs baseline — plus
-    the current live losing streak, so the reader knows whether they'd be
-    "in" right now under that suggestion. Purely descriptive: see the
-    disclaimer this prints alongside the number.
+    """Best k among candidates with enough sample, ranked by |sigma| (not raw
+    edge — sigma already accounts for each k's sample size, so it doesn't
+    reward a big-looking edge that's really just a small-n fluke) — plus the
+    current live losing streak, so the reader knows whether they'd be "in"
+    right now under that suggestion. Purely descriptive: see the disclaimer
+    this prints alongside the number.
     """
     baseline_rate = sum(1 for _, _, hit in full_results if hit) / len(full_results)
 
@@ -245,7 +247,7 @@ def suggest_wait_k(full_results, msg):
         print(msg["waitk_none"].format(min_sample=WAIT_K_MIN_SAMPLE))
         return
 
-    best_k, best_s = max(candidates, key=lambda kv: kv[1]["edge"])
+    best_k, best_s = max(candidates, key=lambda kv: abs(kv[1]["sigma"]))
     print(
         msg["waitk_best"].format(
             k=best_k, n=best_s["n"], rate=best_s["rate"], baseline=baseline_rate,
