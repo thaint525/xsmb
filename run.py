@@ -65,9 +65,9 @@ STRINGS = {
         "explain_top5": "Top 5 kế tiếp nếu muốn dàn rộng: {list}",
         "waitk_header": "\n=== Gợi ý \"đợi thua liên tiếp (cả top-1 + top-2) rồi mới vào top-1 + top-2\" ===",
         "waitk_none": "Không có k nào đủ mẫu (>= {min_sample} lần vào) để gợi ý.",
-        "waitk_best": "k={k}: {n} lần vào, thắng >=1 số {rate:.1%} (baseline {baseline:.1%}, chênh {edge:+.1%}, {sigma:+.2f}σ, lãi TB {net:+,.0f}đ/lần) — |sigma| cao nhất trong các k có mẫu đủ lớn",
+        "waitk_best": "k={k}: {n} lần ({per_week:.2f} lần/tuần), thắng {rate:.1%} ({sigma:+.2f}σ), lãi TB {net:+,.0f}đ/lần — |sigma| cao nhất",
         "waitk_table_header": "Hiệu suất theo từng k:",
-        "waitk_table_row": "  k={k}: {n} lần vào, thắng >=1 số {rate:.1%} (baseline {baseline:.1%}, chênh {edge:+.1%}, {sigma:+.2f}σ, lãi TB {net:+,.0f}đ/lần)",
+        "waitk_table_row": "  k={k}: {n} lần ({per_week:.2f} lần/tuần), thắng {rate:.1%} ({sigma:+.2f}σ), lãi TB {net:+,.0f}đ/lần",
         "waitk_table_skip": "  k={k}: chưa đủ mẫu (< {min_sample} lần vào)",
         "waitk_insig": "=> Chênh lệch này KHÔNG có ý nghĩa thống kê — đây không phải một mức k thật sự tốt hơn, chỉ là ít nhiễu nhất trong dữ liệu hiện có.",
         "waitk_no_streak": "Hiện tại: kỳ gần nhất đang THẮNG, chưa bắt đầu chuỗi thua nào.",
@@ -112,9 +112,9 @@ STRINGS = {
         "explain_top5": "Next 5 for a wider spread: {list}",
         "waitk_header": '\n=== "Wait for a losing streak (both top-1 & top-2) before betting both" suggestion ===',
         "waitk_none": "No k has enough samples (>= {min_sample} entries) to suggest.",
-        "waitk_best": "k={k}: {n} entries, won >=1 number {rate:.1%} (baseline {baseline:.1%}, edge {edge:+.1%}, {sigma:+.2f}σ, avg P/L {net:+,.0f}đ/entry) — highest |sigma| among k values with a large enough sample",
+        "waitk_best": "k={k}: {n} entries ({per_week:.2f}/week), won {rate:.1%} ({sigma:+.2f}σ), avg P/L {net:+,.0f}đ/entry — highest |sigma|",
         "waitk_table_header": "Performance by k:",
-        "waitk_table_row": "  k={k}: {n} entries, won >=1 number {rate:.1%} (baseline {baseline:.1%}, edge {edge:+.1%}, {sigma:+.2f}σ, avg P/L {net:+,.0f}đ/entry)",
+        "waitk_table_row": "  k={k}: {n} entries ({per_week:.2f}/week), won {rate:.1%} ({sigma:+.2f}σ), avg P/L {net:+,.0f}đ/entry",
         "waitk_table_skip": "  k={k}: not enough samples (< {min_sample} entries)",
         "waitk_insig": "=> This edge is NOT statistically significant — it isn't a genuinely better threshold, just the least noisy one in the current data.",
         "waitk_no_streak": "Right now: the last draw was a WIN, no losing streak in progress.",
@@ -283,6 +283,7 @@ def suggest_wait_k(results2, msg):
     the disclaimer this prints alongside the number.
     """
     baseline_rate1 = sum(1 for *_, c1, _c2 in results2 if c1 > 0) / len(results2)
+    weeks_span = (results2[-1][0] - results2[0][0]).days / 7
 
     candidates = []
     for k in WAIT_K_RANGE:
@@ -305,6 +306,7 @@ def suggest_wait_k(results2, msg):
                 msg["waitk_table_row"].format(
                     k=k, n=s["n"], rate=s["either_rate"], baseline=s["baseline_either"],
                     edge=s["either_rate"] - s["baseline_either"], sigma=s["sigma"], net=s["avg_net"],
+                    per_week=s["n"] / weeks_span,
                 )
             )
         else:
@@ -319,6 +321,7 @@ def suggest_wait_k(results2, msg):
         msg["waitk_best"].format(
             k=best_k, n=best_s["n"], rate=best_s["either_rate"], baseline=best_s["baseline_either"],
             edge=best_s["either_rate"] - best_s["baseline_either"], sigma=best_s["sigma"], net=best_s["avg_net"],
+            per_week=best_s["n"] / weeks_span,
         )
     )
     if abs(best_s["sigma"]) < 2:
