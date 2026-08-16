@@ -14,13 +14,17 @@ Usage:
 import argparse
 import csv
 import math
+import sys
 from bisect import bisect_left
 from datetime import datetime, timedelta
 
 import requests
 
-import backtest_streak as streaks
-import backtest_wait_k as waitk
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
+import backtest_wait_k_top2 as top2
 import crawl_loto as crawler
 import predict_loto as predictor
 
@@ -59,16 +63,25 @@ STRINGS = {
         "explain_gan_never": "  - Lô gan           : chưa từng về trong lịch sử đã crawl",
         "explain_weekday": "  - Theo {weekday}      : {rate:.3f} lô/kỳ",
         "explain_top5": "Top 5 kế tiếp nếu muốn dàn rộng: {list}",
-        "waitk_header": "\n=== Gợi ý \"đợi thua liên tiếp rồi mới vào\" ===",
+        "waitk_header": "\n=== Gợi ý \"đợi thua liên tiếp (cả top-1 + top-2) rồi mới vào top-1 + top-2\" ===",
         "waitk_none": "Không có k nào đủ mẫu (>= {min_sample} lần vào) để gợi ý.",
-        "waitk_best": "k={k}: {n} lần vào, thắng {rate:.1%} (baseline {baseline:.1%}, chênh {edge:+.1%}, {sigma:+.2f}σ) — |sigma| cao nhất trong các k có mẫu đủ lớn",
+        "waitk_best": "k={k}: {n} lần vào, thắng >=1 số {rate:.1%} (baseline {baseline:.1%}, chênh {edge:+.1%}, {sigma:+.2f}σ, lãi TB {net:+,.0f}đ/lần) — |sigma| cao nhất trong các k có mẫu đủ lớn",
+        "waitk_table_header": "Hiệu suất theo từng k:",
+        "waitk_table_row": "  k={k}: {n} lần vào, thắng >=1 số {rate:.1%} (baseline {baseline:.1%}, chênh {edge:+.1%}, {sigma:+.2f}σ, lãi TB {net:+,.0f}đ/lần)",
+        "waitk_table_skip": "  k={k}: chưa đủ mẫu (< {min_sample} lần vào)",
         "waitk_insig": "=> Chênh lệch này KHÔNG có ý nghĩa thống kê — đây không phải một mức k thật sự tốt hơn, chỉ là ít nhiễu nhất trong dữ liệu hiện có.",
         "waitk_no_streak": "Hiện tại: kỳ gần nhất đang THẮNG, chưa bắt đầu chuỗi thua nào.",
         "waitk_streak": "Hiện tại: đang thua liên tiếp {n} kỳ (từ {date}).",
         "waitk_ready": "=> Đã đủ {k} kỳ thua theo gợi ý trên (dù vậy vẫn không có edge thật, xem cảnh báo trên).",
         "waitk_wait_more": "=> Còn thiếu {n} kỳ thua nữa mới đủ điều kiện theo gợi ý trên.",
-        "recent_header": "\nHiệu suất top-1 trong {n} kỳ gần nhất: thắng {wins}/{n}",
-        "recent_row": "  {date}  lô {pick}  {result}",
+        "recent2_header": "\nHiệu suất top-1 + top-2 trong {n} kỳ gần nhất:",
+        "recent2_row": "  {date}  lô {pick1}/{pick2}  {result}",
+        "recent2_lose": "Thua",
+        "recent2_win1": "Thắng 1",
+        "recent2_win2": "Thắng 2",
+        "recent_summary_header": "\nTỷ lệ thắng top-1 theo giai đoạn:",
+        "recent_summary_row": "  {n} kỳ gần nhất: thắng {wins}/{n} ({rate:.1%})",
+        "recent_summary_skip": "  {n} kỳ gần nhất: chưa đủ dữ liệu (chỉ có {have} kỳ)",
         "win": "Thắng",
         "lose": "Thua",
         "weekdays": ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"],
@@ -97,16 +110,25 @@ STRINGS = {
         "explain_gan_never": "  - Dry streak        : never hit in the crawled history",
         "explain_weekday": "  - On {weekday}     : {rate:.3f} hits/draw",
         "explain_top5": "Next 5 for a wider spread: {list}",
-        "waitk_header": '\n=== "Wait for a losing streak before betting" suggestion ===',
+        "waitk_header": '\n=== "Wait for a losing streak (both top-1 & top-2) before betting both" suggestion ===',
         "waitk_none": "No k has enough samples (>= {min_sample} entries) to suggest.",
-        "waitk_best": "k={k}: {n} entries, won {rate:.1%} (baseline {baseline:.1%}, edge {edge:+.1%}, {sigma:+.2f}σ) — highest |sigma| among k values with a large enough sample",
+        "waitk_best": "k={k}: {n} entries, won >=1 number {rate:.1%} (baseline {baseline:.1%}, edge {edge:+.1%}, {sigma:+.2f}σ, avg P/L {net:+,.0f}đ/entry) — highest |sigma| among k values with a large enough sample",
+        "waitk_table_header": "Performance by k:",
+        "waitk_table_row": "  k={k}: {n} entries, won >=1 number {rate:.1%} (baseline {baseline:.1%}, edge {edge:+.1%}, {sigma:+.2f}σ, avg P/L {net:+,.0f}đ/entry)",
+        "waitk_table_skip": "  k={k}: not enough samples (< {min_sample} entries)",
         "waitk_insig": "=> This edge is NOT statistically significant — it isn't a genuinely better threshold, just the least noisy one in the current data.",
         "waitk_no_streak": "Right now: the last draw was a WIN, no losing streak in progress.",
         "waitk_streak": "Right now: {n} losses in a row (since {date}).",
         "waitk_ready": "=> Already at {k} losses per the suggestion above (still no real edge though, see the warning above).",
         "waitk_wait_more": "=> {n} more {loss_word} needed to meet the suggestion above.",
-        "recent_header": "\nTop-1 performance over the last {n} draws: won {wins}/{n}",
-        "recent_row": "  {date}  number {pick}  {result}",
+        "recent2_header": "\nTop-1 + top-2 performance over the last {n} draws:",
+        "recent2_row": "  {date}  number {pick1}/{pick2}  {result}",
+        "recent2_lose": "Loss",
+        "recent2_win1": "Win 1",
+        "recent2_win2": "Win 2",
+        "recent_summary_header": "\nTop-1 win rate by window:",
+        "recent_summary_row": "  last {n} draws: won {wins}/{n} ({rate:.1%})",
+        "recent_summary_skip": "  last {n} draws: not enough data (only {have} draws)",
         "win": "Win",
         "lose": "Loss",
         "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
@@ -214,35 +236,80 @@ def explain_top_pick(hist, target, ranked, msg, weekdays):
     return "\n".join(lines)
 
 
-def print_recent(results, msg):
-    wins = sum(1 for _, _, hit in results if hit)
-    print(msg["recent_header"].format(n=len(results), wins=wins))
-    for date, pick, hit in results:
-        result = msg["win"] if hit else msg["lose"]
-        print(msg["recent_row"].format(date=f"{date:%d/%m/%Y}", pick=pick, result=result))
+def print_recent2(results2, msg):
+    """results2: [(date, day_index, pick1, pick2, count1, count2)]."""
+    print(msg["recent2_header"].format(n=len(results2)))
+    for date, _i, pick1, pick2, count1, count2 in results2:
+        if count1 > 0 and count2 > 0:
+            result = msg["recent2_win2"]
+        elif count1 > 0 or count2 > 0:
+            result = msg["recent2_win1"]
+        else:
+            result = msg["recent2_lose"]
+        print(msg["recent2_row"].format(date=f"{date:%d/%m/%Y}", pick1=pick1, pick2=pick2, result=result))
 
 
-def suggest_wait_k(full_results, msg):
+def print_recent_summary(full_results, msg, windows=(7, 30, 100)):
+    print(msg["recent_summary_header"])
+    for n in windows:
+        if len(full_results) < n:
+            print(msg["recent_summary_skip"].format(n=n, have=len(full_results)))
+            continue
+        window = full_results[-n:]
+        wins = sum(1 for _, _, hit in window if hit)
+        print(msg["recent_summary_row"].format(n=n, wins=wins, rate=wins / n))
+
+
+def current_streak_both(results2):
+    """Length and start date of the trailing streak where BOTH top-1 and
+    top-2 missed, still active at the last day.
+    """
+    length, start = 0, None
+    for date, _i, _p1, _p2, count1, count2 in reversed(results2):
+        if count1 > 0 or count2 > 0:
+            break
+        length += 1
+        start = date
+    return length, start
+
+
+def suggest_wait_k(results2, msg):
     """Best k among candidates with enough sample, ranked by |sigma| (not raw
     edge — sigma already accounts for each k's sample size, so it doesn't
     reward a big-looking edge that's really just a small-n fluke) — plus the
     current live losing streak, so the reader knows whether they'd be "in"
-    right now under that suggestion. Purely descriptive: see the disclaimer
-    this prints alongside the number.
+    right now under that suggestion. The wait streak requires BOTH top-1 and
+    top-2 to miss; entering then bets BOTH numbers. Purely descriptive: see
+    the disclaimer this prints alongside the number.
     """
-    baseline_rate = sum(1 for _, _, hit in full_results if hit) / len(full_results)
+    baseline_rate1 = sum(1 for *_, c1, _c2 in results2 if c1 > 0) / len(results2)
 
     candidates = []
     for k in WAIT_K_RANGE:
-        bets = waitk.simulate_wait_k_losses(full_results, k)
+        bets = top2.simulate_wait_k_top2(results2, k, streak_on="both")
         if len(bets) < WAIT_K_MIN_SAMPLE:
             continue
-        s = waitk.summarize(bets, baseline_rate)
+        s = top2.summarize(bets, None, baseline_rate1)
         candidates.append((k, s))
 
-    cur_len, cur_start = streaks.current_streak(full_results)
+    cur_len, cur_start = current_streak_both(results2)
 
     print(msg["waitk_header"])
+
+    print(msg["waitk_table_header"])
+    candidates_by_k = dict(candidates)
+    for k in range(1, 6):
+        if k in candidates_by_k:
+            s = candidates_by_k[k]
+            print(
+                msg["waitk_table_row"].format(
+                    k=k, n=s["n"], rate=s["either_rate"], baseline=s["baseline_either"],
+                    edge=s["either_rate"] - s["baseline_either"], sigma=s["sigma"], net=s["avg_net"],
+                )
+            )
+        else:
+            print(msg["waitk_table_skip"].format(k=k, min_sample=WAIT_K_MIN_SAMPLE))
+
     if not candidates:
         print(msg["waitk_none"].format(min_sample=WAIT_K_MIN_SAMPLE))
         return
@@ -250,8 +317,8 @@ def suggest_wait_k(full_results, msg):
     best_k, best_s = max(candidates, key=lambda kv: abs(kv[1]["sigma"]))
     print(
         msg["waitk_best"].format(
-            k=best_k, n=best_s["n"], rate=best_s["rate"], baseline=baseline_rate,
-            edge=best_s["edge"], sigma=best_s["sigma"],
+            k=best_k, n=best_s["n"], rate=best_s["either_rate"], baseline=best_s["baseline_either"],
+            edge=best_s["either_rate"] - best_s["baseline_either"], sigma=best_s["sigma"], net=best_s["avg_net"],
         )
     )
     if abs(best_s["sigma"]) < 2:
@@ -294,9 +361,11 @@ def main():
     print_ranking_table(ranked, msg)
     print_backtest(hist, msg)
 
-    full_results = streaks.run_strategy(hist, warmup=STREAK_WARMUP)
-    print_recent(full_results[-RECENT_DAYS:], msg)
-    suggest_wait_k(full_results, msg)
+    results2 = top2.run_strategy_top2(hist, warmup=STREAK_WARMUP)
+    full_results = [(date, pick1, count1 > 0) for date, _i, pick1, _pick2, count1, _count2 in results2]
+    print_recent2(results2[-RECENT_DAYS:], msg)
+    print_recent_summary(full_results, msg)
+    suggest_wait_k(results2, msg)
 
     print(msg["final_pick"].format(pick=ranked[0][0]))
 
