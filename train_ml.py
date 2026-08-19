@@ -19,7 +19,7 @@ Pipeline:
 
 Usage:
     python3 train_ml.py
-    python3 train_ml.py --test-days 500 --warmup 365 --rebuild-panel
+    python3 train_ml.py --test-days 2000 --warmup 365 --rebuild-panel
 """
 import argparse
 import math
@@ -162,7 +162,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--input", default="mb_history_long.csv", help="Long CSV từ crawl_loto.py")
     parser.add_argument("--warmup", type=int, default=365, help="Số kỳ đầu bỏ qua khi build panel (default: 365)")
-    parser.add_argument("--test-days", type=int, default=500, help="Số kỳ gần nhất giữ làm test set (default: 500)")
+    parser.add_argument("--test-days", type=int, default=2000, help="Số kỳ gần nhất giữ làm test set (default: 2000)")
     parser.add_argument("--rebuild-panel", action="store_true", help="Bỏ qua cache, build lại panel đặc trưng")
     args = parser.parse_args()
 

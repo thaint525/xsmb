@@ -26,7 +26,7 @@ import predict_loto as predictor
 import run as daily_run
 import train_ml as tml
 
-EVAL_DAYS = 500
+EVAL_DAYS = 2000  # held-out window; the rest of the ~7.4k usable draws trains
 WARMUP = 365
 
 MODEL_SPECS = [
@@ -106,7 +106,7 @@ def print_predictions(predictions, target_date, top_n=5):
 
 def main():
     today = datetime.now()
-    by_date = daily_run.update_dataset(today)
+    by_date = daily_run.update_dataset(today, daily_run.STRINGS["vi"])
 
     hist = predictor.History(
         [(datetime.strptime(d, predictor.DATE_FMT), c) for d, c in by_date.items()]

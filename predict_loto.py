@@ -140,6 +140,21 @@ def score(hist, target_date):
     }
 
 
+def blind_guess_rate(n_distinct, k):
+    """Chance that k blind guesses land on a day's `n_distinct` drawn numbers.
+
+    The model picks k *distinct* numbers, so the fair comparison draws k
+    distinct numbers too — hypergeometric, not the with-replacement
+    (1 - (1 - d/100)**k). They agree at k=1 but diverge as k grows: with
+    replacement understates the baseline (~0.8pp at k=5), which would show
+    up as a spurious edge for the model.
+    """
+    miss = 1.0
+    for i in range(k):
+        miss *= (100 - n_distinct - i) / (100 - i)
+    return 1 - miss
+
+
 def backtest(hist, days, top_ks=(1, 5)):
     """Replay the last `days` draws: how often is a top-k pick an actual hit?
 
@@ -157,7 +172,7 @@ def backtest(hist, days, top_ks=(1, 5)):
         for k in top_ks:
             if any(n in actual for n, _ in ranked[:k]):
                 hits[k] += 1
-            base[k].append(1 - (1 - len(actual) / 100) ** k)
+            base[k].append(blind_guess_rate(len(actual), k))
 
     n_tested = len(tested)
     return {

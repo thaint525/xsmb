@@ -31,8 +31,8 @@ import predict_loto as predictor
 AVG_HITS_PER_NUMBER = 27 / 100  # 27 lô rơi vào 100 số mỗi kỳ, nếu chia đều
 
 DATA_FILE = "mb_history_long.csv"
-FULL_HISTORY_DAYS = 5000  # comfortably covers the site's data (starts 01/01/2014)
-BACKTEST_DAYS = 500
+FULL_HISTORY_DAYS = 8000  # comfortably covers the site's data (starts 01/01/2005)
+BACKTEST_DAYS = None  # None = backtest every draw past the warmup (max sample)
 RECENT_DAYS = 7
 STREAK_WARMUP = 365  # bỏ qua 1 năm đầu khi tính chuỗi thắng/thua + gợi ý k
 WAIT_K_RANGE = range(1, 16)
@@ -187,7 +187,8 @@ def print_ranking_table(ranked, msg):
 
 
 def print_backtest(hist, msg):
-    bt = predictor.backtest(hist, BACKTEST_DAYS)
+    days = BACKTEST_DAYS if BACKTEST_DAYS else hist.n_days - STREAK_WARMUP
+    bt = predictor.backtest(hist, days)
     print(msg["backtest_header"].format(days=bt["days"]))
     max_sigma = 0.0
     for k, r in bt["results"].items():

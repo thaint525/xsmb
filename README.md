@@ -1,6 +1,6 @@
 # lotte — thống kê & thử dự đoán loto XSMB
 
-Crawl lịch sử quay số XSMB (xoso.com.vn), thử nhiều chiến lược/model để dự đoán
+Crawl lịch sử quay số XSMB (minhngoc.net.vn), thử nhiều chiến lược/model để dự đoán
 số về, và backtest nghiêm túc từng chiến lược để trả lời câu hỏi: **có cách
 nào dự đoán tốt hơn ngẫu nhiên không?**
 
@@ -33,14 +33,15 @@ không cần chạy script crawl riêng trước.
 | `mb_history_long.csv` | Dataset chính: `date,number,count` — mỗi kỳ x mỗi số 00-99. Nguồn cho mọi script khác. |
 | `ml_panel_w365.csv` | Cache feature panel cho ML (`train_ml.py`/`run_ml.py` tự rebuild khi data đổi). |
 
-Site chỉ có dữ liệu XSMB từ **01/01/2014** — không crawl được xa hơn dù xin
+Site có dữ liệu XSMB từ **01/01/2005** — không crawl được xa hơn dù xin
 `--days` bao nhiêu.
 
 ### Crawl
 
-- **`crawl_loto.py`** — gọi thẳng endpoint AJAX nội bộ của xoso.com.vn
-  (`/ThongKe/AjaxTanSuatLo`), tự chia nhỏ request nếu `--days` > 1000 (giới hạn
-  mỗi lần gọi của site).
+- **`crawl_loto.py`** — scrape trang kết quả theo ngày của minhngoc.net.vn
+  (`/ket-qua-xo-so/mien-bac/DD-MM-YYYY.html`), lấy 2 số cuối của cả 27 giải
+  làm "lô". Mỗi trang render sẵn 7 ngày (ngày yêu cầu + 6 ngày trước) nên
+  crawl cả năm chỉ tốn ~52 request.
   ```bash
   python3 crawl_loto.py --days 2000 --output mb_2000d
   ```
@@ -54,7 +55,7 @@ Site chỉ có dữ liệu XSMB từ **01/01/2014** — không crawl được xa
   python3 predict_loto.py --input mb_history_long.csv --target-date 05/08/2026
   ```
 - **`run.py`** — bản end-to-end: tự crawl cập nhật rồi chạy `predict_loto.py`,
-  kèm giải thích vì sao số top-1 đứng đầu, backtest 500 kỳ, và hiệu suất
+  kèm giải thích vì sao số top-1 đứng đầu, backtest toàn bộ lịch sử, và hiệu suất
   top-1 trong 30 kỳ gần nhất.
 
 ### Backtest các chiến lược "dân gian"
@@ -74,10 +75,10 @@ Site chỉ có dữ liệu XSMB từ **01/01/2014** — không crawl được xa
   thời gian (không shuffle), đánh giá AUC-ROC / log-loss / Brier / calibration
   / backtest top-1.
   ```bash
-  python3 train_ml.py --test-days 500 --rebuild-panel
+  python3 train_ml.py --test-days 2000 --rebuild-panel
   ```
 - **`run_ml.py`** — bản end-to-end: crawl cập nhật → rebuild panel → train +
-  đánh giá trên 500 kỳ gần nhất → refit trên 100% dữ liệu → predict kỳ tiếp
+  đánh giá trên 2000 kỳ gần nhất → refit trên 100% dữ liệu → predict kỳ tiếp
   theo, so sánh xem 2 model có đồng thuận hay không.
 
 ## Kết luận
