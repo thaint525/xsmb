@@ -17,6 +17,9 @@ import math
 import sys
 from bisect import bisect_left
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 import requests
 
@@ -347,7 +350,7 @@ def main():
     msg = STRINGS[args.lang]
     weekdays = msg["weekdays"]
 
-    today = datetime.now()
+    today = datetime.now(VN_TZ).replace(tzinfo=None)
     by_date = update_dataset(today, msg)
 
     hist = predictor.History(
