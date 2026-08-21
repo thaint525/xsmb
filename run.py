@@ -36,7 +36,7 @@ AVG_HITS_PER_NUMBER = 27 / 100  # 27 lô rơi vào 100 số mỗi kỳ, nếu ch
 DATA_FILE = "mb_history_long.csv"
 FULL_HISTORY_DAYS = 8000  # comfortably covers the site's data (starts 01/01/2005)
 BACKTEST_DAYS = None  # None = backtest every draw past the warmup (max sample)
-RECENT_DAYS = 30
+RECENT_DAYS = 7
 STREAK_WARMUP = 365  # bỏ qua 1 năm đầu khi tính chuỗi thắng/thua + gợi ý k
 WAIT_K_RANGE = range(1, 16)
 WAIT_K_MIN_SAMPLE = 200  # bỏ qua k nào có quá ít lần vào để tránh gợi ý dựa trên mẫu nhỏ
