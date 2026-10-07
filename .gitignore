@@ -5,6 +5,11 @@ __pycache__/
 # Regeneratable ML feature cache (large, rebuilt automatically by train_ml.py/run_ml.py)
 ml_panel_w365.csv
 
+# Regeneratable top-1 pick cache (rebuilt automatically by backtest_wait_k.py)
+top1_picks_w*.csv
+
+.DS_Store
+
 # Leftover ad-hoc crawl outputs from early experiments, superseded by mb_history_long.csv
 mb_1000d_long.csv
 mb_1000d_summary.csv

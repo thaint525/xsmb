@@ -29,8 +29,9 @@ DATE_FMT = "%d/%m/%Y"
 NUMBERS = [f"{i:02d}" for i in range(100)]
 HEAT_WINDOW = 30
 
-# Weights are a judgement call, not a fitted result — see the backtest output.
-WEIGHTS = {"freq_long": 0.3, "heat": 0.8, "overdue": 0.6, "weekday": 0.7}
+# Picked by search_weights.py on the 2006-2020 train split only; 2020-2026 test
+# gave +0.53σ vs break-even — still noise. weekday hurt out-of-sample, so it's 0.
+WEIGHTS = {"freq_long": 0.5, "heat": 0.5, "overdue": 0.25, "weekday": 0.0}
 
 WEEKDAYS_VI = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]
 
